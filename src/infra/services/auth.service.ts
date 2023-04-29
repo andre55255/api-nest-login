@@ -7,6 +7,8 @@ import { ThrowHttpException } from 'src/dtos/utils/http-exception.dto';
 import { UserRepositoryInterface } from 'src/core/repositories/user-repo.service-interface';
 import { TreatmentException } from 'src/helpers/static-methods';
 import { JwtPayloadDto } from 'src/dtos/auth/jwt-payload.dto';
+import { RefreshDto } from 'src/dtos/auth/refresh.dto';
+import { role, user, user_roles } from '@prisma/client';
 
 @Injectable()
 export class AuthService implements AuthServiceInterface {
@@ -48,24 +50,11 @@ export class AuthService implements AuthServiceInterface {
       const roles = userExist.roles.map((role) => {
         return role.role.normalized_name;
       });
-
-      const accessToken = await this.generateAccessToken(
-        userExist.id,
-        userExist.email,
-        userExist.username,
-        roles
-      );
-
-      const refreshToken = await this.generateRefreshToken(
-        userExist.id,
-        userExist.email,
-        userExist.username,
-      );
-      await this.setRefreshToken(userExist.id, refreshToken);
+      const tokens = await this.getTokens(userExist);
 
       return {
-        accessToken,
-        refreshToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         user: {
           id: userExist.id,
           username: userExist.username,
@@ -78,6 +67,98 @@ export class AuthService implements AuthServiceInterface {
         err,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'Falha inesperada ao realizar login',
+      );
+    }
+  }
+
+  public async refresh(dto: RefreshDto): Promise<RefreshDto> {
+    try {
+      const data = this.jwtService.decode(dto.accessToken);
+      console.log(data);
+
+      const userData = data as JwtPayloadDto;
+      if (!userData) {
+        this.logger.warn(`Falha ao pegar dados de usuário do token`);
+        ThrowHttpException({
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Falha ao pegar dados de token',
+        });
+        return;
+      }
+
+      const userSave = await this.userRepo.findById(userData.id);
+      if (!userSave) {
+        this.logger.warn(
+          `Não foi encontrado um usuário com o id ${userData.id}`,
+        );
+        ThrowHttpException({
+          status: HttpStatus.NOT_FOUND,
+          message: 'Usuário não encontrado',
+        });
+        return;
+      }
+
+      if (userSave.refresh_token !== dto.refreshToken) {
+        this.logger.warn(
+          `Refresh token diferente do existente na base de dados. Informado: ${dto.refreshToken}. Banco: ${userSave.refresh_token}`,
+        );
+        ThrowHttpException({
+          status: HttpStatus.NOT_FOUND,
+          message: 'Refresh token diferente do existente na base de dados',
+        });
+        return;
+      }
+
+      const tokens = await this.getTokens(userSave);
+      return tokens;
+    } catch (err) {
+      TreatmentException(
+        err,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Falha inesperada ao realizar refresh token',
+        `access ${dto.accessToken}, refresh ${dto.refreshToken}`,
+      );
+    }
+  }
+
+  private async getTokens(
+    user:
+      | (user & {
+          roles: (user_roles & {
+            role: role;
+          })[];
+        })
+      | null,
+  ): Promise<RefreshDto> {
+    try {
+      const roles = user.roles.map((role) => {
+        return role.role.normalized_name;
+      });
+
+      const accessToken = await this.generateAccessToken(
+        user.id,
+        user.email,
+        user.username,
+        roles,
+      );
+
+      const refreshToken = await this.generateRefreshToken(
+        user.id,
+        user.email,
+        user.username,
+      );
+      await this.setRefreshToken(user.id, refreshToken);
+
+      return {
+        accessToken,
+        refreshToken
+      };
+    } catch (err) {
+      TreatmentException(
+        err,
+        HttpStatus.BAD_REQUEST,
+        'Falha inesperada ao gerar tokens',
+        `de usuário ${JSON.stringify(user)}`,
       );
     }
   }
@@ -130,7 +211,7 @@ export class AuthService implements AuthServiceInterface {
 
       const accessToken = await this.jwtService.signAsync(payload, {
         secret: process.env.JWT_SECRET,
-        expiresIn: '0.5h',
+        expiresIn: process.env.JWT_EXPIRES_IN_ACCESS_TOKEN,
         audience: process.env.JWT_AUDIENCE,
         issuer: process.env.JWT_ISSUER,
       });

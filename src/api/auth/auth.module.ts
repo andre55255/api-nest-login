@@ -5,6 +5,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { UserRepositoryInterface } from 'src/core/repositories/user-repo.service-interface';
 import { UserRepository } from 'src/infra/repositories/user-repo.service';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from '../guard/auth-roles.guard';
 
 @Module({
   providers: [
@@ -15,6 +17,10 @@ import { UserRepository } from 'src/infra/repositories/user-repo.service';
     {
       provide: UserRepositoryInterface,
       useClass: UserRepository
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard
     }
   ],
   controllers: [AuthController],

@@ -22,6 +22,12 @@ export class AuthGuard implements CanActivate {
         message: 'Token de acesso não encontrado',
       });
     }
+    await this.insertUserData(token, request);
+
+    return true;
+  }
+
+  private async insertUserData(token: string, request: Request): Promise<void> {
     try {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET,
@@ -35,7 +41,6 @@ export class AuthGuard implements CanActivate {
         message: 'Token inválido'
       })
     }
-    return true;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

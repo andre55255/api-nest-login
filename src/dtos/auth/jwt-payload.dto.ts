@@ -1,4 +1,4 @@
-export interface JwtPayloadDto {
+export class JwtPayloadDto {
     id: string;
     username: string;
     email: string;
