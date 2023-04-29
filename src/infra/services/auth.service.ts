@@ -6,6 +6,7 @@ import { AuthServiceInterface } from 'src/core/services/auth.service-interface';
 import { ThrowHttpException } from 'src/dtos/utils/http-exception.dto';
 import { UserRepositoryInterface } from 'src/core/repositories/user-repo.service-interface';
 import { TreatmentException } from 'src/helpers/static-methods';
+import { JwtPayloadDto } from 'src/dtos/auth/jwt-payload.dto';
 
 @Injectable()
 export class AuthService implements AuthServiceInterface {
@@ -44,10 +45,15 @@ export class AuthService implements AuthServiceInterface {
         return;
       }
 
+      const roles = userExist.roles.map((role) => {
+        return role.role.normalized_name;
+      });
+
       const accessToken = await this.generateAccessToken(
         userExist.id,
         userExist.email,
         userExist.username,
+        roles
       );
 
       const refreshToken = await this.generateRefreshToken(
@@ -56,10 +62,6 @@ export class AuthService implements AuthServiceInterface {
         userExist.username,
       );
       await this.setRefreshToken(userExist.id, refreshToken);
-
-      const roles = userExist.roles.map((role) => {
-        return role.role.normalized_name;
-      });
 
       return {
         accessToken,
@@ -121,9 +123,10 @@ export class AuthService implements AuthServiceInterface {
     id: string,
     email: string,
     username: string,
+    roles: string[],
   ): Promise<string> {
     try {
-      const payload = { id, username, email };
+      const payload: JwtPayloadDto = { id, username, email, roles };
 
       const accessToken = await this.jwtService.signAsync(payload, {
         secret: process.env.JWT_SECRET,
