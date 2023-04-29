@@ -1,9 +1,16 @@
-import { Module } from '@nestjs/common';
-import { AuthModule } from './api/auth/auth.module';
+import { Module, Global } from '@nestjs/common';
 import { PrismaModule } from 'src/database/prisma.module';
-import { RootModule } from './api/_root/_root.module';
+import { RepositoriesModule } from './infra/repositories.module';
+import { ServiceModule } from './infra/services.module';
+import { ApiModule } from './api/api.module';
 
+@Global()
 @Module({
-  imports: [AuthModule, PrismaModule, RootModule],
+  imports: [
+    PrismaModule,
+    RepositoriesModule,
+    ServiceModule,
+    ApiModule
+  ],
 })
 export class AppModule {}

@@ -103,7 +103,6 @@ export class UserRepository implements UserRepositoryInterface {
 
       return user;
     } catch (err) {
-      console.log(err);
       this.logger.error(
         `Falha inesperada ao buscar usuário com o username ${username}`,
         err,

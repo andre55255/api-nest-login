@@ -74,7 +74,6 @@ export class AuthService implements AuthServiceInterface {
   public async refresh(dto: RefreshDto): Promise<RefreshDto> {
     try {
       const data = this.jwtService.decode(dto.accessToken);
-      console.log(data);
 
       const userData = data as JwtPayloadDto;
       if (!userData) {
