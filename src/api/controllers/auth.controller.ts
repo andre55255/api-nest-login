@@ -20,6 +20,7 @@ import { RefreshDto } from 'src/dtos/auth/refresh.dto';
 import { Roles } from '../guard/auth-roles.decorator';
 import { Role } from '../guard/auth-roles.data';
 import { RolesGuard } from '../guard/auth-roles.guard';
+import { RequestResetPasswordDto } from 'src/dtos/auth/reset-password.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -73,6 +74,20 @@ export class AuthController {
         err,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'Falha inesperada ao pegar novos tokens'
+      );
+    }
+  }
+
+  @Post('resetPassword')
+  @HttpCode(200)
+  async resetPassword(@Body() dto: RequestResetPasswordDto): Promise<void> {
+    try {
+      await this.authService.resetPassword(dto);
+    } catch (err) {
+      TreatmentException(
+        err,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Falha inesperada ao executar rotina de recuperação de senha'
       );
     }
   }

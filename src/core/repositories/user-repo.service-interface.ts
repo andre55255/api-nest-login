@@ -20,6 +20,8 @@ export abstract class UserRepositoryInterface {
     | null
   >;
 
+  public abstract setNewPassword(userId: string, newPassword: string): Promise<void>;
+
   public abstract setRefreshToken(
     userId: string,
     refreshToken: string,

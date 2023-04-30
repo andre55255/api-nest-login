@@ -4,6 +4,7 @@
 ###### Para testar deve-se adicionar um arquivo .env com as variáveis a seguir:
 #
 > PORT=8081 Porta onde vai rodar a api <br>
+> ENVIRONMENT=dev Tipo de ambiente de execução <br>
 > DATABASE_URL="postgresql://usuario:senha@localhost:5432/nome do banco?schema=public" <br>
 #
 > JWT_SECRET=chave secreta de geração e validação de token <br>
@@ -13,6 +14,7 @@
 #
 > EMAIL_HOST=endereço de smtp
 > EMAIL_PORT=porta de smtp
+> EMAIL_SSL=true definição se vai usar ssl ou não
 > EMAIL_USER=usuário de smtp
 > EMAIL_PASS=senha de smtp
 #

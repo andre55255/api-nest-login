@@ -1,3 +1,3 @@
-export const CONSTANTS_TEMPLATE_EMAIL_NAME = {
-    resetPassword: 'reset-password.html'
+export const Constants = {
+    templateEmailResetPassword: 'reset-password.html',
 }

@@ -5,10 +5,12 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthServiceInterface } from 'src/core/services/auth.service-interface';
 import { ThrowHttpException } from 'src/dtos/utils/http-exception.dto';
 import { UserRepositoryInterface } from 'src/core/repositories/user-repo.service-interface';
-import { TreatmentException } from 'src/helpers/static-methods';
+import { TreatmentException, generateRandomValue } from 'src/helpers/static-methods';
 import { JwtPayloadDto } from 'src/dtos/auth/jwt-payload.dto';
 import { RefreshDto } from 'src/dtos/auth/refresh.dto';
 import { role, user, user_roles } from '@prisma/client';
+import { SendMailServiceInterface } from 'src/core/services/send-mail.service-interface';
+import { RequestResetPasswordDto } from 'src/dtos/auth/reset-password.dto';
 
 @Injectable()
 export class AuthService implements AuthServiceInterface {
@@ -17,6 +19,7 @@ export class AuthService implements AuthServiceInterface {
   constructor(
     private readonly jwtService: JwtService,
     private readonly userRepo: UserRepositoryInterface,
+    private readonly mailService: SendMailServiceInterface
   ) {}
 
   public async signIn(dto: AuthDto): Promise<AuthResponseDto> {
@@ -65,7 +68,7 @@ export class AuthService implements AuthServiceInterface {
     } catch (err) {
       TreatmentException(
         err,
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.BAD_REQUEST,
         'Falha inesperada ao realizar login',
       );
     }
@@ -113,9 +116,57 @@ export class AuthService implements AuthServiceInterface {
     } catch (err) {
       TreatmentException(
         err,
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.BAD_REQUEST,
         'Falha inesperada ao realizar refresh token',
         `access ${dto.accessToken}, refresh ${dto.refreshToken}`,
+      );
+    }
+  }
+
+  public async resetPassword(dto: RequestResetPasswordDto): Promise<void> {
+    try {
+      const user = await this.userRepo.findByUsername(dto.username);
+      if (!user) {
+        TreatmentException(
+          null,
+          HttpStatus.NOT_FOUND,
+          'Usuário não encontrado',
+          `Com o nome de usuário: ${dto.username}`
+        )
+        return;
+      }
+
+      const newPass = generateRandomValue(6);
+      await this.mailService.sendMailResetPassword({
+        name: user.username,
+        username: user.username,
+        email: user.email,
+        newPassword: newPass
+      });
+      
+      const hashPass = await this.hashPassword(newPass);
+      await this.userRepo.setNewPassword(user.id, hashPass);
+    } catch (err) {
+      TreatmentException(
+        err,
+        HttpStatus.BAD_REQUEST,
+        'Falha inesperada ao realizar recuperação de senha',
+        `data ${JSON.stringify(dto)}`,
+      );
+    }
+  }
+
+  private async hashPassword(pass: string): Promise<string> {
+    try {
+      const saltOfRounds = 10;
+
+      const response = await bcrypt.hash(pass, saltOfRounds);
+      return response;
+    } catch (err) {
+      TreatmentException(
+        err,
+        HttpStatus.BAD_REQUEST,
+        'Falha inesperada ao tratar senha',
       );
     }
   }

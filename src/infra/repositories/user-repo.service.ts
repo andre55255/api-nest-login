@@ -2,7 +2,6 @@ import { Logger, HttpStatus, Injectable } from '@nestjs/common';
 import { role, user, user_roles } from '@prisma/client';
 import { UserRepositoryInterface } from 'src/core/repositories/user-repo.service-interface';
 import { PrismaService } from 'src/database/prisma.service';
-import { ThrowHttpException } from 'src/dtos/utils/http-exception.dto';
 import { ResultDto, ResultFail, ResultOk } from 'src/dtos/utils/result.dto';
 import { TreatmentException } from 'src/helpers/static-methods';
 
@@ -44,23 +43,45 @@ export class UserRepository implements UserRepositoryInterface {
     }
   }
 
+  public async setNewPassword(userId: string, newPassword: string): Promise<void> {
+    try {
+      const result = await this.prisma.user.update({
+        where: {
+          id: userId
+        },
+        data: {
+          password_hash: newPassword,
+          updated_at: new Date()
+        }
+      });
+
+      if (!result) {
+        TreatmentException(
+          null,
+          HttpStatus.BAD_REQUEST,
+          'Não foi possível editar usuário na base de dados',
+          `usuário ${JSON.stringify(result)}`
+        );
+      } 
+    } catch (err) {
+      TreatmentException(
+        err,
+        HttpStatus.BAD_REQUEST,
+        'Falha inesperada ao editar dados de usuário',
+        `${userId}`
+      );
+    }
+  }
+
   public async setRefreshToken(
     userId: string,
     refreshToken: string,
   ): Promise<ResultDto> {
     try {
-      const user = await this.findById(userId);
-      if (!user) {
-        ThrowHttpException({
-          status: HttpStatus.NOT_FOUND,
-          message: 'Usuário não encontrado para setar refresh token',
-        });
-        return;
-      }
-
       const result = await this.prisma.user.update({
         data: {
           refresh_token: refreshToken,
+          updated_at: new Date()
         },
         where: {
           id: userId,

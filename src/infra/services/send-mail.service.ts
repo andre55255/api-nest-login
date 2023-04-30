@@ -1,28 +1,29 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { SendMailServiceInterface } from 'src/core/services/send-mail.service-interface';
-import nodemailer from 'nodemailer';
-import { TreatmentException } from 'src/helpers/static-methods';
+import * as nodemailer from 'nodemailer';
+import { TreatmentException, getBasePath } from 'src/helpers/static-methods';
 import SMTPTransport, { MailOptions } from 'nodemailer/lib/smtp-transport';
 import { EmailOptionsDto } from 'src/dtos/email/email-options.dto';
-import fs from 'fs';
+import * as fs from 'fs';
+import * as path from 'path';
 import { MailResetPasswordDto } from 'src/dtos/auth/reset-password.dto';
-import { CONSTANTS_TEMPLATE_EMAIL_NAME } from 'src/helpers/constants';
+import { Constants } from 'src/helpers/constants';
 
 export class SendMailService implements SendMailServiceInterface {
+  private readonly logger = new Logger('SendMailService');
+
   public async sendMailResetPassword(
     data: MailResetPasswordDto,
   ): Promise<void> {
     try {
-      let html = this.getTemplateHtmlData(
-        CONSTANTS_TEMPLATE_EMAIL_NAME.resetPassword,
-      );
+      let html = this.getTemplateHtmlData(Constants.templateEmailResetPassword);
       html = html.replace('[[NAME_USER]]', data.name);
       html = html.replace('[[NEW_PASSWORD]]', data.newPassword);
 
       const mailOptions = this.buildMailOptions({
         destination: [data.email],
         subject: `Recuperação de senha - ${data.username}`,
-        body: html
+        body: html,
       });
 
       await this.sendMail(mailOptions);
@@ -41,6 +42,11 @@ export class SendMailService implements SendMailServiceInterface {
       const transporter = this.buildTransportMail();
       const result = await transporter.sendMail(options);
       if (result && result.messageId) {
+        this.logger.log(
+          `Email enviado: ${JSON.stringify(options)} - ${JSON.stringify(
+            result,
+          )}`,
+        );
         return;
       }
       TreatmentException(
@@ -64,10 +70,10 @@ export class SendMailService implements SendMailServiceInterface {
   private buildMailOptions(options: EmailOptionsDto): MailOptions {
     try {
       const response: MailOptions = {
-        from: process.env.EMAIL_HOST,
+        from: process.env.EMAIL_USER,
         to: options.destination,
         subject: options.subject,
-        html: options.body
+        html: options.body,
       };
 
       return response;
@@ -83,50 +89,49 @@ export class SendMailService implements SendMailServiceInterface {
 
   private getTemplateHtmlData(templateName: string): string {
     try {
-      const path = `${__dirname}/public/templates/${templateName}`;
-      if (!fs.existsSync(path)) {
+      const pathName = `${getBasePath()}${path.sep}public${path.sep}templates${
+        path.sep
+      }${templateName}`;
+      if (!fs.existsSync(pathName)) {
         TreatmentException(
           null,
           HttpStatus.BAD_REQUEST,
           'Template de email não encontrado',
-          `Caminho: ${path}`,
+          `Caminho: ${pathName}`,
         );
         return;
       }
-      fs.readFile(path, (err, data) => {
-        if (err) {
-          TreatmentException(
-            null,
-            HttpStatus.BAD_REQUEST,
-            'Falha na leitura de template de email',
-            `Caminho: ${path}. Erro: ${err}`,
-          );
-          return;
-        }
-        return data.toString();
-      });
+      const result = fs.readFileSync(pathName);
+      const response = Buffer.from(result).toString();
+      return response;
     } catch (err) {
       TreatmentException(
         err,
         HttpStatus.BAD_REQUEST,
         'Falha inesperada ao pegar template de email',
-        `Template: ${__dirname}/public/templates/${templateName}`,
+        `Template: ${__dirname}${path.sep}public${path.sep}templates${path.sep}${templateName}`,
       );
     }
   }
 
   private buildTransportMail(): nodemailer.Transporter<SMTPTransport.SentMessageInfo> {
     try {
-      const transporter = nodemailer.createTransport({
+      const data = {
         host: process.env.EMAIL_HOST,
         port: Number(process.env.EMAIL_PORT),
-        secure: true,
+        ssl: process.env.EMAIL_SSL === 'true' ? true : false,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      };
+
+      const transporter = nodemailer.createTransport({
+        from: data.user,
+        host: data.host,
+        port: data.port,
+        secure: data.ssl,
         auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-        tls: {
-          rejectUnauthorized: false,
+          user: data.user,
+          pass: data.pass,
         },
       });
 
